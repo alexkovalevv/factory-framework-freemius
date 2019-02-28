@@ -1,6 +1,6 @@
 <?php
 
-namespace WBCR\Factory_Licensing_000;
+namespace WBCR\Factory_Freemius_000;
 
 use Freemius_Api_WordPress;
 use Freemius_Exception;
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 3. Adds caching layer to GET requests.
  * 4. Adds consistency for failed requests by using last cached version.
  *
- * @author Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com> *
+ * @author Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com>
  * @copyright (c) 2018, Webcraftic Ltd
  *
  * @package core
@@ -283,7 +283,7 @@ final class Api {
 	 *
 	 * @return bool True if successful connectivity to the API.
 	 */
-	public static function test( $plugin ) {
+	/*public static function test( $plugin ) {
 		self::init( $plugin );
 		
 		$cache_key = 'ping_test';
@@ -308,15 +308,15 @@ final class Api {
 					 *
 					 * @since 1.1.6
 					 */
-					self::$_options->set_option( 'api_force_http', false, true );
-				}
-			}
-			
-			self::$_cache->set( $cache_key, $test, WP_FS__TIME_5_MIN_IN_SEC );
-		}
-		
-		return $test;
+	/*	self::$_options->set_option( 'api_force_http', false, true );
 	}
+}
+
+self::$_cache->set( $cache_key, $test, WP_FS__TIME_5_MIN_IN_SEC );
+}
+
+return $test;
+}*/
 	
 	/**
 	 * Check if API is temporary down.
@@ -340,7 +340,7 @@ final class Api {
 	 *
 	 * @return object
 	 */
-	private function get_temporary_unavailable_error() {
+	/*private function get_temporary_unavailable_error() {
 		return (object) array(
 			'error' => (object) array(
 				'type'    => 'TemporaryUnavailable',
@@ -349,7 +349,7 @@ final class Api {
 				'http'    => 503
 			)
 		);
-	}
+	}*/
 	
 	/**
 	 * Ping API for connectivity test, and return result object.
@@ -362,7 +362,7 @@ final class Api {
 	 *
 	 * @return object
 	 */
-	public function ping( $unique_anonymous_id = null, $params = array() ) {
+	/*public function ping( $unique_anonymous_id = null, $params = array() ) {
 		if ( self::is_temporary_down() ) {
 			return $this->get_temporary_unavailable_error();
 		}
@@ -387,7 +387,7 @@ final class Api {
 		}
 		
 		return $pong;
-	}
+	}*/
 	
 	/**
 	 * Check if based on the API result we should try
@@ -400,7 +400,7 @@ final class Api {
 	 *
 	 * @return bool
 	 */
-	private static function should_try_with_http( $result ) {
+	/*private static function should_try_with_http( $result ) {
 		if ( ! Freemius_Api_WordPress::IsHttps() ) {
 			return false;
 		}
@@ -412,5 +412,5 @@ final class Api {
 				'squid_cache_block',
 				'too_many_requests',
 			) ) );
-	}
+	}*/
 }
