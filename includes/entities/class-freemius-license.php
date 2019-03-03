@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @copyright (c) 2018 Webraftic Ltd, Freemius, Inc.
  * @version 1.0
  */
-class License extends Entity {
+class License extends Entity implements \WBCR\Factory_000\Premium\Interfaces\License {
 	
 	/**
 	 * @var number
@@ -91,7 +91,7 @@ class License extends Entity {
 	/**
 	 * @param stdClass|bool $license
 	 */
-	function __construct( $license = false ) {
+	public function __construct( $license = false ) {
 		parent::__construct( $license );
 	}
 	
@@ -100,8 +100,38 @@ class License extends Entity {
 	 *
 	 * @return string
 	 */
-	static function get_type() {
+	public static function get_type() {
 		return 'license';
+	}
+	
+	/**
+	 * Example: #sk_f=>}-5vuHp$3*wPQHxd(AD3<);1&i
+	 * @return string|null
+	 */
+	public function get_key() {
+		return $this->secret_key;
+	}
+	
+	/**
+	 * Example:  #sk_f=>}-5vuHp$3******d(AD3<);1&i
+	 * @return mixed
+	 */
+	public function get_secret_key() {
+		return substr_replace( $this->get_key(), '******', 15, 6 );
+	}
+	
+	/**
+	 * @return string|null
+	 */
+	public function get_plan() {
+		return $this->plan_title;
+	}
+	
+	/**
+	 * @return int
+	 */
+	public function get_count_active_sites() {
+	
 	}
 	
 	/**
@@ -112,7 +142,7 @@ class License extends Entity {
 	 *
 	 * @return int
 	 */
-	function left() {
+	public function get_site_activations_left() {
 		if ( ! $this->is_active() || $this->is_expired() ) {
 			return 0;
 		}
@@ -125,6 +155,42 @@ class License extends Entity {
 	}
 	
 	/**
+	 * @param string $format Return time in formats (time|days|date)
+	 *
+	 * @return float|int|string
+	 */
+	public function get_expiration_time( $format = 'time' ) {
+		if ( $format == 'days' ) {
+			if ( $this->is_lifetime() ) {
+				return 999;
+			}
+			
+			$remaining      = strtotime( $this->expiration ) - date( 'U' );
+			$days_remaining = floor( $remaining / 86400 );
+			
+			return $days_remaining;
+		} else if ( $format == 'date' ) {
+			return date( 'Y-m-d', strtotime( $this->expiration ) );
+		}
+		
+		return $this->expiration;
+	}
+	
+	/**
+	 * @param $actual_license_data
+	 */
+	/*public function sync( $actual_license_data ) {
+		$props = get_object_vars( $this );
+		
+		foreach ( $props as $key => $def_value ) {
+			$this->{$key} = isset( $actual_license_data->{$key} ) ? $actual_license_data->{$key} : $def_value;
+		}
+		if ( isset( $actual_license_data->expiration ) and is_null( $actual_license_data->expiration ) ) {
+			$this->expiration = null;
+		}
+	}*/
+	
+	/**
 	 * Check if single site license.
 	 *
 	 * @author Vova Feldman (@svovaf)
@@ -132,7 +198,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_single_site() {
+	public function is_single_site() {
 		return ( is_numeric( $this->quota ) && 1 == $this->quota );
 	}
 	
@@ -142,7 +208,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_expired() {
+	public function is_expired() {
 		return ! $this->is_lifetime() && ( strtotime( $this->expiration ) < date( 'U' ) );
 	}
 	
@@ -154,7 +220,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_valid() {
+	public function is_valid() {
 		return ! $this->is_expired();
 	}
 	
@@ -164,7 +230,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_lifetime() {
+	public function is_lifetime() {
 		return is_null( $this->expiration );
 	}
 	
@@ -174,7 +240,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_unlimited() {
+	public function is_unlimited() {
 		return is_null( $this->quota );
 	}
 	
@@ -188,7 +254,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_utilized( $is_localhost = null ) {
+	public function is_utilized( $is_localhost = null ) {
 		if ( is_null( $is_localhost ) ) {
 			$is_localhost = false; // была WP_FS__IS_LOCALHOST_FOR_SERVER
 		}
@@ -210,7 +276,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function can_activate( $is_localhost = null ) {
+	public function can_activate( $is_localhost = null ) {
 		return ! $this->is_utilized( $is_localhost ) && $this->is_features_enabled();
 	}
 	
@@ -225,18 +291,18 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function can_activate_bulk( $production_count, $localhost_count ) {
-		if ( $this->is_unlimited() ) {
-			return true;
-		}
-		
-		/**
-		 * For simplicity, the logic will work as following: when given X sites to activate the license on, if it's
-		 * possible to activate on ALL of them, do the activation. If it's not possible to activate on ALL of them,
-		 * do NOT activate on any of them.
-		 */
-		return ( $this->quota >= $this->activated + $production_count + ( $this->is_free_localhost ? 0 : $this->activated_local + $localhost_count ) );
-	}
+	//public function can_activate_bulk( $production_count, $localhost_count ) {
+	//if ( $this->is_unlimited() ) {
+	//return true;
+	//}
+	
+	/**
+	 * For simplicity, the logic will work as following: when given X sites to activate the license on, if it's
+	 * possible to activate on ALL of them, do the activation. If it's not possible to activate on ALL of them,
+	 * do NOT activate on any of them.
+	 */
+	//return ( $this->quota >= $this->activated + $production_count + ( $this->is_free_localhost ? 0 : $this->activated_local + $localhost_count ) );
+	//}
 	
 	/**
 	 * @author Vova Feldman (@svovaf)
@@ -244,7 +310,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_active() {
+	public function is_active() {
 		return ( ! $this->is_cancelled );
 	}
 	
@@ -259,7 +325,7 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_features_enabled() {
+	public function is_features_enabled() {
 		return $this->is_active() && ( ! $this->is_block_features || ! $this->is_expired() );
 	}
 	
@@ -273,41 +339,15 @@ class License extends Entity {
 	 *
 	 * @return bool
 	 */
-	function is_first_payment_pending() {
+	public function is_first_payment_pending() {
 		return ( 86400 >= strtotime( $this->expiration ) - strtotime( $this->created ) );
 	}
 	
 	/**
 	 * @return int
 	 */
-	function total_activations() {
+	public function total_activations() {
 		return ( $this->activated + $this->activated_local );
 	}
 	
-	/**
-	 * @return float|int
-	 */
-	public function remainingDays() {
-		if ( $this->is_lifetime() ) {
-			return 999;
-		}
-		$remaining      = strtotime( $this->expiration ) - date( 'U' );
-		$days_remaining = floor( $remaining / 86400 );
-		
-		return $days_remaining;
-	}
-	
-	/**
-	 * @param $actual_license_data
-	 */
-	public function sync( $actual_license_data ) {
-		$props = get_object_vars( $this );
-		
-		foreach ( $props as $key => $def_value ) {
-			$this->{$key} = isset( $actual_license_data->{$key} ) ? $actual_license_data->{$key} : $def_value;
-		}
-		if ( isset( $actual_license_data->expiration ) and is_null( $actual_license_data->expiration ) ) {
-			$this->expiration = null;
-		}
-	}
 }

@@ -31,7 +31,6 @@ require_once( FACTORY_FREEMIUS_000_DIR . '/includes/entities/class-freemius-site
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/entities/class-freemius-license.php' );
 
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/licensing/class-freemius-provider.php' );
-require_once( FACTORY_FREEMIUS_000_DIR . '/includes/licensing/class-freemius-storage.php' );
 
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/updates/class-freemius-repository.php' );
 

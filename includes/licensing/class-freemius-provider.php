@@ -2,10 +2,16 @@
 
 namespace WBCR\Factory_Freemius_000\Licensing;
 
-use Exception;
+use WBCR\Factory_Freemius_000\Entities\License;
+use WBCR\Factory_Freemius_000\Entities\Plugin;
+use WBCR\Factory_Freemius_000\Entities\Site;
+use WBCR\Factory_Freemius_000\Entities\User;
+use WBCR\Factory_000\Premium\Provider as License_Provider;
 use Wbcr_Factory000_Plugin;
 use WBCR\Factory_Freemius_000\Api;
-use WBCR\Factory_000\Premium\License\Provider as License_Provider;
+use WP_Error;
+use Exception;
+use stdClass;
 
 // Exit if accessed directly
 if ( ! defined( 'ABSPATH' ) ) {
@@ -18,52 +24,62 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @copyright (c) 2018 Webraftic Ltd, Freemius, Inc.
  * @version 1.0
  */
-class Provider extends License_Provider {
-	
-	/**
-	 * @var Storage
-	 */
-	protected $storage;
+final class Provider extends License_Provider {
 	
 	/**
 	 * @var int
 	 */
-	protected $plugin_id;
+	private $plugin_id;
 	
 	/**
 	 * @var string
 	 */
-	protected $public_key;
+	private $public_key;
 	
 	/**
 	 * @var string
 	 */
-	protected $slug;
+	private $slug;
 	
 	/**
-	 * @var \WBCR\Factory_Freemius_000\Entities\Site|null
+	 * @var \WBCR\Factory_Freemius_000\Api
 	 */
-	protected $site_data;
-	
-	/**
-	 * @var \WBCR\Factory_Freemius_000\Entities\User|null
-	 */
-	protected $user_data;
-	
-	/**
-	 * @var \WBCR\Factory_Freemius_000\Entities\License|null
-	 */
-	protected $license_data;
-	
-	/**
-	 * @var \WBCR\Factory_Freemius_000\Entities\License|null
-	 */
-	protected $plugin_data;
-	
-	
 	private $site_api;
+	
+	/**
+	 * @var \WBCR\Factory_Freemius_000\Api
+	 */
 	private $plugin_api;
+	
+	/**
+	 * @var \WBCR\Factory_Freemius_000\Api
+	 */
 	private $user_api;
+	
+	/**
+	 * @var bool
+	 */
+	private $is_activate_license = false;
+	
+	/**
+	 * @var License|null
+	 */
+	private $license;
+	
+	/**
+	 * @var Site|null
+	 */
+	private $license_site;
+	
+	/**
+	 * @var User|null
+	 */
+	private $license_user;
+	
+	/**
+	 * @var Plugin|null
+	 */
+	private $license_plugin;
 	
 	/**
 	 * Manager constructor.
@@ -75,7 +91,6 @@ class Provider extends License_Provider {
 	public function __construct( Wbcr_Factory000_Plugin $plugin, array $settings ) {
 		parent::__construct( $plugin, $settings );
 		
-		$this->storage    = new Storage( $plugin );
 		$this->plugin_id  = $this->get_setting( 'plugin_id', null );
 		$this->public_key = $this->get_setting( 'public_key', null );
 		$this->slug       = $this->get_setting( 'slug', null );
@@ -84,24 +99,316 @@ class Provider extends License_Provider {
 			throw new Exception( 'One of required (plugin_id, public_key, slug) attrs is empty.' );
 		}
 		
-		$this->site_data    = $this->storage->get_site_entity();
-		$this->user_data    = $this->storage->get_user_entity();
-		$this->license_data = $this->storage->get_license_entity();
-		$this->plugin_data  = $this->storage->get_plugin_entity();
+		$this->init_license();
 	}
 	
 	/**
+	 * @return bool
+	 * @throws Exception
+	 */
+	public function is_activate() {
+		return $this->is_activate_license;
+	}
+	
+	/**
+	 * @return bool
+	 * @throws Exception
+	 */
+	public function is_active() {
+		if ( ! $this->is_activate_license ) {
+			return false;
+		}
+		
+		return $this->get_license()->is_valid();
+	}
+	
+	/**
+	 * @return string
+	 * @throws Exception
+	 */
+	public function get_plan() {
+		if ( ! $this->is_activate_license ) {
+			return null;
+		}
+		
+		return $this->get_license()->plan_title;
+	}
+	
+	/**
+	 * @return \WBCR\Factory_Freemius_000\Entities\License|null
+	 * @throws Exception
+	 */
+	public function get_license() {
+		return $this->license;
+	}
+	
+	/**
+	 * @param string $key
 	 *
-	 * @author Vova Feldman (@svovaf)
-	 * @since  1.0.2
+	 * @return bool|mixed
+	 * @throws \Freemius_Exception
+	 * @throws Exception
+	 */
+	public function activate( $key ) {
+		
+		$license_key = trim( rtrim( $key ) );
+		
+		if ( $this->is_activate_license ) {
+			if ( $this->license->id == $license_key ) {
+				$this->sync();
+				
+				return true;
+			}
+			$this->deactivate();
+		}
+		
+		$url          = 'https://wp.freemius.com/action/service/user/install/';
+		$unique_id    = md5( get_site_url() . SECURE_AUTH_KEY );
+		$request_body = array(
+			'plugin_slug'                  => $this->slug,
+			'plugin_id'                    => $this->plugin_id,
+			'plugin_public_key'            => $this->public_key,
+			'plugin_version'               => $this->plugin->getPluginVersion(),
+			'is_active'                    => true,
+			'is_premium'                   => true,
+			'format'                       => 'json',
+			'is_disconnected'              => false,
+			'license_key'                  => $key,
+			'site_url'                     => get_home_url(), //site_uid
+			'site_uid'                     => $unique_id,
+			'language'                     => get_bloginfo( 'language' ),
+			'charset'                      => get_bloginfo( 'charset' ),
+			'platform_version'             => get_bloginfo( 'version' ),
+			'sdk_version'                  => '2.1.1',
+			'programming_language_version' => phpversion(),
+		);
+		
+		$responce = wp_remote_post( $url, array(
+			'body'    => $request_body,
+			'timeout' => 15,
+		) );
+		
+		if ( is_wp_error( $responce ) ) {
+			return new WP_Error( 'alert-danger', $responce->get_error_message() );
+		}
+		if ( isset( $responce['response']['code'] ) && $responce['response']['code'] == 403 ) {
+			return new WP_Error( 'alert-danger', 'http error' );
+		}
+		
+		$responce_data = json_decode( $responce['body'] );
+		
+		if ( isset( $responce_data->error ) ) {
+			return new WP_Error( 'alert-danger', $responce_data->error );
+		}
+		
+		$license_user = new User( $responce_data );
+		$license_site = new Site( $responce_data );
+		
+		$user_api = $this->get_api_user_scope( $license_user );
+		$site_api = $this->get_api_site_scope( $license_site );
+		
+		$user_licensies = $user_api->call( $this->get_plugin_endpoint() . '/licenses.json', 'GET' );
+		
+		foreach ( $user_licensies->licenses as $user_license ) {
+			if ( $user_license->secret_key == $license_key ) {
+				$license = new License( $user_license );
+			}
+		}
+		
+		$request_plan_path = $this->get_plugin_endpoint() . '/plans/' . $license->plan_id . '.json';
+		$request_plan      = $user_api->call( $request_plan_path, 'GET' );
+		
+		$license->plan_title = $request_plan->title;
+		
+		$request_subscriptions_path = $this->get_license_endpoint( $license ) . '/subscriptions.json';
+		$request_subscriptions      = $site_api->call( $request_subscriptions_path, 'GET' );
+		
+		if ( isset( $request_subscriptions->subscriptions ) && isset( $request_subscriptions->subscriptions[0] ) ) {
+			$license->billing_cycle = $request_subscriptions->subscriptions[0]->billing_cycle;
+		}
+		
+		$this->init_license( $license, $license_user, $license_site );
+		$this->save_license_data();
+		
+		$plugin_name  = $this->plugin->getPluginName();
+		$license_info = array(
+			'provider'        => 'freemius',
+			'is_active'       => $this->is_active(),
+			'license_key'     => $this->get_license()->get_key(),
+			'expiration_time' => $this->get_license()->get_expiration_time()
+		);
+		
+		/**
+		 * @param string $license_info Дополнительная информация о лицензии
+		 * @param string $plugin_name Имя плагина
+		 *
+		 * @since 1.0.0
+		 */
+		do_action( 'wbcr/factory/license_activate', $license_info, $plugin_name );
+		
+		return true;
+	}
+	
+	/**
+	 * @return bool
+	 * @throws \Freemius_Exception
+	 * @throws Exception
+	 */
+	public function deactivate() {
+		if ( ! $this->is_activate_license ) {
+			return true;
+		}
+		
+		$plugin_name  = $this->plugin->getPluginName();
+		$license_info = array(
+			'provider'        => 'freemius',
+			'is_active'       => $this->is_active(),
+			'license_key'     => $this->get_license()->get_key(),
+			'expiration_time' => $this->get_license()->get_expiration_time()
+		);
+		
+		$site_api = $this->get_api_site_scope( $this->license_site );
+		$user_api = $this->get_api_user_scope( $this->license_user );
+		
+		$site_api->call( $this->get_license_endpoint( $this->license ) . '.json?license_key=' . $this->license->get_key(), 'DELETE' );
+		$user_api->call( $this->get_plugin_endpoint() . '/installs.json?ids=' . $this->license_site->id, 'DELETE' );
+		
+		// todo: добавить обработку ошибок
+		
+		$this->delete_license_data();
+		
+		/**
+		 * @param string $license_info Дополнительная информация о лицензии
+		 * @param string $plugin_name Имя плагина
+		 *
+		 * @since 1.0.0
+		 */
+		do_action( 'wbcr/factory/license_deactivate', $license_info, $plugin_name );
+		
+		return true;
+	}
+	
+	/**
+	 * Синхронизирует данные текущей лицензии.
 	 *
+	 * @return bool
+	 * @throws Exception
+	 */
+	public function sync() {
+		if ( ! $this->is_activate_license ) {
+			return false;
+		}
+		
+		$site_api = $this->get_api_site_scope( $this->license_site );
+		$user_api = $this->get_api_user_scope( $this->license_user );
+		
+		$use_license_key      = urlencode( $this->license->secret_key );
+		$request_license_path = $this->get_license_endpoint( $this->license ) . '.json?license_key=' . $use_license_key;
+		$request_license      = $site_api->call( $request_license_path, 'GET' );
+		
+		$request_install_path = $this->get_plugin_endpoint() . '/installs.json?ids=' . $this->license_site->id;
+		$request_installs     = $user_api->call( $request_install_path, 'GET' );
+		
+		if ( $request_installs->installs[0]->license_id !== $this->license->id ) {
+			$this->deactivate();
+			
+			return true;
+		}
+		
+		$request_subscriptions_path = $this->get_license_endpoint( $this->license ) . '/subscriptions.json';
+		$request_subscriptions      = $site_api->call( $request_subscriptions_path, 'GET' );
+		
+		$request_plan_path = $this->get_plugin_endpoint() . '/plans/' . $this->license->plan_id . '.json';
+		$request_plan      = $user_api->call( $request_plan_path, 'GET' );
+		
+		$this->license->plan_title = $request_plan->title;
+		
+		if ( isset( $request_subscriptions->subscriptions ) && isset( $request_subscriptions->subscriptions[0] ) ) {
+			if ( ! is_null( $request_subscriptions->subscriptions[0]->next_payment ) ) {
+				$this->license->billing_cycle = $request_subscriptions->subscriptions[0]->billing_cycle;
+			}
+		}
+		
+		$this->license->populate( $request_license );
+		$this->save_license_data();
+		
+		$plugin_name  = $this->plugin->getPluginName();
+		$license_info = array(
+			'provider'        => 'freemius',
+			'is_active'       => $this->is_active(),
+			'license_key'     => $this->get_license()->get_key(),
+			'expiration_time' => $this->get_license()->get_expiration_time()
+		);
+		
+		/**
+		 * @param string $license_info Дополнительная информация о лицензии
+		 * @param string $plugin_name Имя плагина
+		 *
+		 * @since 1.0.0
+		 */
+		do_action( 'wbcr/factory/license_sync', $license_info, $plugin_name );
+		
+		return true;
+	}
+	
+	/**
+	 * Используется ли платная подписка на обновления плагина.
+	 *
+	 * @return bool
+	 */
+	public function has_paid_subscription() {
+		if ( ! $this->is_activate_license ) {
+			return false;
+		}
+		
+		return ! empty( $this->license->billing_cycle );
+	}
+	
+	/**
+	 * Отменяет платную подписку в freemius.com
+	 *
+	 * @return bool
+	 * @throws Exception
+	 */
+	public function cancel_paid_subscription() {
+		if ( ! $this->is_activate_license ) {
+			return false;
+		}
+		
+		$site_api = $this->get_api_site_scope( $this->license_site );
+		
+		$request_subscriptions = $site_api->call( $this->get_license_endpoint( $this->license ) . '/subscriptions.json', 'GET' );
+		
+		if ( isset( $request_subscriptions->subscriptions ) && isset( $request_subscriptions->subscriptions[0] ) ) {
+			$site_api->call( 'downgrade.json', 'PUT' );
+			$this->license->billing_cycle = null;
+			$this->save_license_data();
+		}
+		
+		return true;
+	}
+	
+	/**
+	 * Отписывается от платной подписики на обновления
+	 *
+	 * @return WP_Error
+	 */
+	/*public function unsubscribe() {
+	
+	}*/
+	
+	// GETTERS SECTION
+	// -----------------------------------------------------------------------------------
+	
+	/**
 	 * @param bool $flush
 	 *
 	 * @return \WBCR\Factory_Freemius_000\Api
+	 * @throws Exception
 	 */
-	private function get_api_user_scope( $flush = false ) {
+	private function get_api_user_scope( User $user, $flush = false ) {
 		if ( ! isset( $this->user_api ) || $flush ) {
-			$this->user_api = Api::instance( $this->plugin, 'user', $this->user_data->id, $this->user_data->public_key, false, $this->user_data->secret_key );
+			$this->user_api = Api::instance( $this->plugin, 'user', $user->id, $user->public_key, false, $user->secret_key );
 		}
 		
 		return $this->user_api;
@@ -111,10 +418,11 @@ class Provider extends License_Provider {
 	 * @param bool $flush
 	 *
 	 * @return \WBCR\Factory_Freemius_000\Api
+	 * @throws Exception
 	 */
-	private function get_api_site_scope( $flush = false ) {
+	private function get_api_site_scope( Site $site, $flush = false ) {
 		if ( ! isset( $this->site_api ) || $flush ) {
-			$this->site_api = Api::instance( $this->plugin, 'install', $this->site_data->id, $this->site_data->public_key, false, $this->site_data->secret_key );
+			$this->site_api = Api::instance( $this->plugin, 'install', $site->id, $site->public_key, false, $site->secret_key );
 		}
 		
 		return $this->site_api;
@@ -124,64 +432,115 @@ class Provider extends License_Provider {
 	 * Get plugin public API scope.
 	 *
 	 * @return \WBCR\Factory_Freemius_000\Api
+	 * @throws Exception
 	 */
-	function get_api_plugin_scope() {
+	private function get_api_plugin_scope() {
 		if ( ! isset( $this->plugin_api ) ) {
-			$this->plugin_api = Api::instance( $this->plugin, 'plugin', $this->plugin_data->id, $this->plugin_data->public_key, false );
+			$this->plugin_api = Api::instance( $this->plugin, 'plugin', $this->plugin_id, $this->public_key, false );
 		}
 		
 		return $this->plugin_api;
 	}
 	
-	public function has_paid_subscription() {
-		return true;
+	/**
+	 * @param License $license
+	 *
+	 * @return string
+	 */
+	private function get_license_endpoint( License $license ) {
+		return '/licenses/' . $license->id;
 	}
 	
-	public function get_license_provider_name() {
-		return $this->get_setting( 'provider' );
+	/**
+	 * @return string
+	 * @throws Exception
+	 */
+	private function get_plugin_endpoint() {
+		return '/plugins/' . $this->plugin_id;
 	}
 	
-	public function get_license_key() {
-		#sk_f=>}-5vuHp$3*wPQHxd(AD3<);1&i
+	// END GETTERS SECTION
+	// -----------------------------------------------------------------------------------
+	
+	/**
+	 * @return void
+	 * @throws Exception
+	 */
+	private function init_license( $license = null, $license_user = null, $license_site = null, $license_plugin = null ) {
+		
+		if ( $this->is_activate_license ) {
+			return;
+		}
+		
+		if ( $license instanceof License && $license_user instanceof User && $license_site instanceof Site ) {
+			$this->license        = $license;
+			$this->license_site   = $license_site;
+			$this->license_user   = $license_user;
+			$this->license_plugin = $license_plugin;
+		} else {
+			$license_data = $this->plugin->getPopulateOption( 'license', array() );
+			
+			if ( empty( $license_data ) || ! ( isset( $license_data['license'] ) && isset( $license_data['site'] ) && isset( $license_data['user'] ) ) ) {
+				return;
+			}
+			
+			$this->license      = new License( $license_data['license'] );
+			$this->license_site = new Site( $license_data['site'] );
+			$this->license_user = new User( $license_data['user'] );
+			
+			if ( isset( $license_data['plugin'] ) ) {
+				$this->license_plugin = new Plugin( $license_data['plugin'] );
+			}
+		}
+		
+		if ( $this->license->id && $this->license_site->id && $this->license_user->id ) {
+			$this->is_activate_license = true;
+		}
 	}
 	
-	public function get_secret_license_key() {
-		#sk_f=>}-5vuHp$3******d(AD3<);1&i
+	/**
+	 * Сбрасывает всю объектную информацию о лицензии
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	private function flush_license_data() {
+		$this->license        = null;
+		$this->license_site   = null;
+		$this->license_user   = null;
+		$this->license_plugin = null;
+		
+		$this->user_api = null;
+		$this->site_api = null;
 	}
 	
-	public function get_license_expiration_time() {
-	
+	/**
+	 * Сбрасывает всю объектную информацию о лицензии и удаляет
+	 * данные о лицензии из базы данных.
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	private function delete_license_data() {
+		$this->flush_license_data();
+		
+		$this->plugin->deletePopulateOption( 'license' );
 	}
 	
-	public function get_count_active_sites() {
-	
-	}
-	
-	public function get_plan() {
-	
-	}
-	
-	public function is_install_premium() {
-	
-	}
-	
-	public function is_license_activate() {
-	
-	}
-	
-	public function is_lifetime() {
-	
-	}
-	
-	public function license_activate() {
-	
-	}
-	
-	public function license_deactivate() {
-	
-	}
-	
-	public function paid_subscription_cancel() {
-	
+	/**
+	 * Сохраняет лицензионные данные в базе данных, если данные
+	 * уже есть в базе данных, метод просто обновляет их.
+	 */
+	private function save_license_data() {
+		if ( ! $this->license || ! $this->license_site || ! $this->license_user ) {
+			return;
+		}
+		
+		$this->plugin->updatePopulateOption( 'license', array(
+			'license' => $this->license,
+			'site'    => $this->license_site,
+			'user'    => $this->license_user,
+			'plugin'  => $this->license_plugin
+		) );
 	}
 }
