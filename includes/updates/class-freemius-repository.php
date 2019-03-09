@@ -3,6 +3,7 @@
 namespace WBCR\Factory_Freemius_000\Updates;
 
 // Exit if accessed directly
+use Exception;
 use Wbcr_Factory000_Plugin;
 use WBCR\Factory_000\Updates\Repository;
 
@@ -11,8 +12,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- *
- *
  * @author Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com>
  * @link https://webcraftic.com
  * @copyright (c) 2018 Webraftic Ltd
@@ -21,53 +20,81 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Freemius_Repository extends Repository {
 	
 	/**
+	 * @var \WBCR\Factory_Freemius_000\Premium\Provider
+	 */
+	private $premium;
+	
+	/**
 	 * Freemius constructor.
 	 * @since 4.0.0
 	 *
 	 * @param Wbcr_Factory000_Plugin $plugin
+	 *
+	 * @throws Exception
 	 */
 	public function __construct( Wbcr_Factory000_Plugin $plugin, $is_premium = false ) {
 		$this->plugin     = $plugin;
 		$this->is_premium = $is_premium;
+		$this->premium    = $this->plugin->premium;
+		
+		if ( ! $is_premium && ! $this->premium instanceof \WBCR\Factory_Freemius_000\Premium\Provider ) {
+			throw new Exception( "This repository type requires Freemius premium provider." );
+		}
+		
+		if ( ! $is_premium && ! $this->premium->is_activate() ) {
+			throw new Exception( "Only premium plugins can check or receive updates via Freemius repository." );
+		}
+		
+		add_filter( 'http_request_host_is_external', array(
+			$this,
+			'http_request_host_is_external_filter'
+		), 10, 3 );
 	}
 	
+	/**
+	 * @return bool
+	 */
 	public function need_check_updates() {
 		return true;
 	}
 	
+	/**
+	 * @return bool|mixed
+	 */
 	public function is_support_premium() {
 		return true;
 	}
 	
+	/**
+	 * @return string|null
+	 * @throws Exception
+	 */
 	public function get_download_url() {
-		/*$site_scope   = $this->license_manager->get_site_api();
-		$user_scope   = $this->license_manager->get_user_api();
-		$plugin_scope = $this->license_manager->get_plugin_api();
+		return $this->premium->get_package_download_url();
+	}
+	
+	/**
+	 * @return string|null
+	 * @throws Exception
+	 */
+	public function get_last_version() {
+		try {
+			$last_package = $this->premium->get_downloadable_package_info();
+			
+			$last_version = $last_package->version;
+			
+			if ( empty( $last_version ) ) {
+				return null;
+			}
+		} catch( Exception $e ) {
+			if ( defined( 'FACTORY_UPDATES_DEBUG' ) && FACTORY_UPDATES_DEBUG ) {
+				throw new Exception( $e->getMessage(), $e->getCode() );
+			}
+			
+			return null;
+		}
 		
-		$plugin_id  = $this->license_manager->get_plugin_id();
-		$site       = $this->license_manager->get_storage()->get( 'site' );
-		$install_id = $site->id;*/
-		//$updates       = $site_scope->Api( 'updates.json?version=1.2.0', 'GET' );
-		
-		//$tag    = $user_scope->Api( "/plugins/$plugin_id/updates/latest.json" );
-		//$tag_id = $tag->id;
-		
-		//$updates = $site_scope->Api( "/updates/$tag_id.zip?is_premium=true", 'GET' );
-		
-		//$download_url = $site_scope->GetSignedUrl("/plugins/".$plugin_id."/tags/". $tag_id . ".zip?is_premium=true");
-		
-		//$updates       = $site_scope->Api( 'updates.json?version=1.2.0', 'GET' );
-		
-		//$ee         = $site_scope->Api( "/updates/latest.json?is_premium=true" );
-		
-		//$tag    = $user_scope->Api( "/plugins/$plugin_id/updates/latest.zip?is_premium=true&type=all" );
-		
-		//$test = 'fsfsd';
-		//return $this->license_manager->get_upgrade_url();
-		//https://private-anon-f0ca70055f-freemius.apiary-mock.com/v1/users/{user_id}/plugins/{plugin_id}/updates/latest.json
-		
-		//https://private-anon-f0ca70055f-freemius.apiary-mock.com/v1/developers
-		///developer_id/plugins/plugin_id/installs/install_id/updates/tag_id.zip?is_premium=true
+		return $last_version;
 	}
 	
 	/**
@@ -86,11 +113,7 @@ class Freemius_Repository extends Repository {
 	 *
 	 * @return bool
 	 */
-	/*function http_request_host_is_external_filter( $allow, $host, $url ) {
+	function http_request_host_is_external_filter( $allow, $host, $url ) {
 		return ( false !== strpos( $host, 'freemius' ) ) ? true : $allow;
-	}*/
-	
-	public function get_check_version_url() {
-		//
 	}
 }

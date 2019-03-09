@@ -116,7 +116,7 @@ class License extends Entity implements \WBCR\Factory_000\Premium\Interfaces\Lic
 	 * Example:  #sk_f=>}-5vuHp$3******d(AD3<);1&i
 	 * @return mixed
 	 */
-	public function get_secret_key() {
+	public function get_hidden_key() {
 		return substr_replace( $this->get_key(), '******', 15, 6 );
 	}
 	
@@ -128,10 +128,24 @@ class License extends Entity implements \WBCR\Factory_000\Premium\Interfaces\Lic
 	}
 	
 	/**
+	 * @return mixed
+	 */
+	public function get_billing_cycle() {
+		return $this->billing_cycle;
+	}
+	
+	/**
+	 * @return int
+	 */
+	public function get_sites_quota() {
+		return $this->quota;
+	}
+	
+	/**
 	 * @return int
 	 */
 	public function get_count_active_sites() {
-	
+		return $this->activated;
 	}
 	
 	/**

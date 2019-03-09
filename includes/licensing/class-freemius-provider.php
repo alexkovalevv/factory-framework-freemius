@@ -1,6 +1,6 @@
 <?php
 
-namespace WBCR\Factory_Freemius_000\Licensing;
+namespace WBCR\Factory_Freemius_000\Premium;
 
 use WBCR\Factory_Freemius_000\Entities\License;
 use WBCR\Factory_Freemius_000\Entities\Plugin;
@@ -131,7 +131,19 @@ final class Provider extends License_Provider {
 			return null;
 		}
 		
-		return $this->get_license()->plan_title;
+		return $this->get_license()->get_plan();
+	}
+	
+	/**
+	 * @return string
+	 * @throws Exception
+	 */
+	public function get_billing_cycle() {
+		if ( ! $this->is_activate_license ) {
+			return null;
+		}
+		
+		return $this->get_license()->get_billing_cycle();
 	}
 	
 	/**
@@ -140,6 +152,79 @@ final class Provider extends License_Provider {
 	 */
 	public function get_license() {
 		return $this->license;
+	}
+	
+	/**
+	 * @return string|null
+	 * @throws \Freemius_Exception
+	 * @throws Exception
+	 */
+	public function get_package_download_url() {
+		
+		if ( ! $this->is_activate_license ) {
+			return null;
+		}
+		
+		$endpoint = "/updates/latest.zip";
+		
+		$endpoint = add_query_arg( array(
+			'is_premium' => json_encode( true ),
+			'type'       => 'all'
+		), $endpoint );
+		
+		try {
+			return $this->get_api_site_scope( $this->license_site )->get_signed_url( $endpoint );
+		} catch( \Freemius_Exception $e ) {
+			throw new Exception( $e->getMessage(), $e->getCode() );
+		}
+	}
+	
+	/**
+	 * @return array|mixed|string
+	 * @throws \Freemius_Exception
+	 * @throws Exception
+	 */
+	public function get_downloadable_package_info() {
+		
+		if ( ! $this->is_activate_license ) {
+			return null;
+		}
+		try {
+			$latest = $this->get_api_site_scope( $this->license_site )->call( "/updates/latest.json" );
+			
+			if ( isset( $latest->error ) ) {
+				throw new Exception( $latest->error );
+			}
+		} catch( \Freemius_Exception $e ) {
+			throw new Exception( $e->getMessage(), $e->getCode() );
+		}
+		
+		return $latest;
+	}
+	
+	/**
+	 * @param string $current_version
+	 *
+	 * @throws \Freemius_Exception
+	 * @throws Exception
+	 */
+	public function get_package_updates( $current_version ) {
+		
+		if ( ! $this->is_activate_license ) {
+			return null;
+		}
+		
+		try {
+			$updates = $this->get_api_site_scope( $this->license_site )->call( 'updates.json?version=' . $current_version, 'GET' );
+			
+			if ( isset( $updates->error ) ) {
+				throw new Exception( $updates->error );
+			}
+		} catch( \Freemius_Exception $e ) {
+			throw new Exception( $e->getMessage(), $e->getCode() );
+		}
+		
+		return $updates;
 	}
 	
 	/**
@@ -159,6 +244,7 @@ final class Provider extends License_Provider {
 				
 				return true;
 			}
+			
 			$this->deactivate();
 		}
 		
@@ -173,7 +259,7 @@ final class Provider extends License_Provider {
 			'is_premium'                   => true,
 			'format'                       => 'json',
 			'is_disconnected'              => false,
-			'license_key'                  => $key,
+			'license_key'                  => $license_key,
 			'site_url'                     => get_home_url(), //site_uid
 			'site_uid'                     => $unique_id,
 			'language'                     => get_bloginfo( 'language' ),
@@ -189,8 +275,9 @@ final class Provider extends License_Provider {
 		) );
 		
 		if ( is_wp_error( $responce ) ) {
-			return new WP_Error( 'alert-danger', $responce->get_error_message() );
+			throw new Exception( $responce->get_error_message() );
 		}
+		
 		if ( isset( $responce['response']['code'] ) && $responce['response']['code'] == 403 ) {
 			return new WP_Error( 'alert-danger', 'http error' );
 		}
@@ -198,7 +285,7 @@ final class Provider extends License_Provider {
 		$responce_data = json_decode( $responce['body'] );
 		
 		if ( isset( $responce_data->error ) ) {
-			return new WP_Error( 'alert-danger', $responce_data->error );
+			throw new Exception( $responce_data->error );
 		}
 		
 		$license_user = new User( $responce_data );
@@ -505,10 +592,12 @@ final class Provider extends License_Provider {
 	 * @return void
 	 */
 	private function flush_license_data() {
-		$this->license        = null;
-		$this->license_site   = null;
-		$this->license_user   = null;
-		$this->license_plugin = null;
+		
+		$this->is_activate_license = false;
+		$this->license             = null;
+		$this->license_site        = null;
+		$this->license_user        = null;
+		$this->license_plugin      = null;
 		
 		$this->user_api = null;
 		$this->site_api = null;

@@ -42,7 +42,11 @@ class Entity {
 			return;
 		}
 		
-		$this->populate( $entity );
+		$props = get_object_vars( $this );
+		
+		foreach ( $props as $key => $def_value ) {
+			$this->{$key} = isset( $entity->{$key} ) ? $entity->{$key} : $def_value;
+		}
 	}
 	
 	public function populate( $data ) {
