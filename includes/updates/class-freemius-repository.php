@@ -32,18 +32,24 @@ class Freemius_Repository extends Repository {
 	 *
 	 * @throws Exception
 	 */
-	public function __construct( Wbcr_Factory000_Plugin $plugin, $is_premium = false ) {
-		$this->plugin     = $plugin;
-		$this->is_premium = $is_premium;
-		$this->premium    = $this->plugin->premium;
-		
-		if ( ! $is_premium && ! $this->premium instanceof \WBCR\Factory_Freemius_000\Premium\Provider ) {
+	public function __construct( Wbcr_Factory000_Plugin $plugin ) {
+		$this->plugin  = $plugin;
+		$this->premium = $this->plugin->premium;
+	}
+	
+	/**
+	 * @throws Exception
+	 */
+	public function init() {
+		if ( ! $this->premium instanceof \WBCR\Factory_Freemius_000\Premium\Provider ) {
 			throw new Exception( "This repository type requires Freemius premium provider." );
 		}
 		
-		if ( ! $is_premium && ! $this->premium->is_activate() ) {
+		if ( ! $this->premium->is_activate() ) {
 			throw new Exception( "Only premium plugins can check or receive updates via Freemius repository." );
 		}
+		
+		$this->initialized = true;
 		
 		add_filter( 'http_request_host_is_external', array(
 			$this,
@@ -81,9 +87,7 @@ class Freemius_Repository extends Repository {
 		try {
 			$last_package = $this->premium->get_downloadable_package_info();
 			
-			$last_version = $last_package->version;
-			
-			if ( empty( $last_version ) ) {
+			if ( empty( $last_package->version ) ) {
 				return null;
 			}
 		} catch( Exception $e ) {
@@ -94,7 +98,7 @@ class Freemius_Repository extends Repository {
 			return null;
 		}
 		
-		return $last_version;
+		return $last_package->version;
 	}
 	
 	/**

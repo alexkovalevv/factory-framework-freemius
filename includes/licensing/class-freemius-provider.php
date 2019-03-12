@@ -169,7 +169,7 @@ final class Provider extends License_Provider {
 		
 		$endpoint = add_query_arg( array(
 			'is_premium' => json_encode( true ),
-			'type'       => 'all'
+			//'type'       => 'all'
 		), $endpoint );
 		
 		try {
@@ -249,7 +249,6 @@ final class Provider extends License_Provider {
 		}
 		
 		$url          = 'https://wp.freemius.com/action/service/user/install/';
-		$unique_id    = md5( get_site_url() . SECURE_AUTH_KEY );
 		$request_body = array(
 			'plugin_slug'                  => $this->slug,
 			'plugin_id'                    => $this->plugin_id,
@@ -257,16 +256,20 @@ final class Provider extends License_Provider {
 			'plugin_version'               => $this->plugin->getPluginVersion(),
 			'is_active'                    => true,
 			'is_premium'                   => true,
-			'format'                       => 'json',
+			'is_uninstalled'               => false,
+			'is_marketing_allowed'         => false,
 			'is_disconnected'              => false,
+			'user_ip'                      => $this->get_user_ip(),
+			'format'                       => 'json',
 			'license_key'                  => $license_key,
+			'site_name'                    => get_bloginfo( 'name' ),
 			'site_url'                     => get_home_url(), //site_uid
-			'site_uid'                     => $unique_id,
+			'site_uid'                     => $this->get_unique_site_id(),
 			'language'                     => get_bloginfo( 'language' ),
 			'charset'                      => get_bloginfo( 'charset' ),
 			'platform_version'             => get_bloginfo( 'version' ),
-			'sdk_version'                  => '2.1.1',
-			'programming_language_version' => phpversion(),
+			'sdk_version'                  => '2.2.3',
+			'programming_language_version' => phpversion()
 		);
 		
 		$responce = wp_remote_post( $url, array(
@@ -486,6 +489,66 @@ final class Provider extends License_Provider {
 	
 	// GETTERS SECTION
 	// -----------------------------------------------------------------------------------
+	
+	/**
+	 * Unique site identifier (Hash).
+	 *
+	 * @author Vova Feldman (@svovaf)
+	 * @since  1.1.0
+	 *
+	 * @param null|int $blog_id Since 2.0.0
+	 *
+	 * @return string
+	 */
+	protected function get_unique_site_id() {
+		$key = str_replace( array( 'http://', 'https://' ), '', get_site_url() );
+		
+		$secure_auth = SECURE_AUTH_KEY;
+		if ( empty( $secure_auth ) || false !== strpos( $secure_auth, ' ' ) ) {
+			// Protect against default auth key.
+			$secure_auth = md5( microtime() );
+		}
+		
+		/**
+		 * Base the unique identifier on the WP secure authentication key. Which
+		 * turns the key into a secret anonymous identifier. This will help us
+		 * to avoid duplicate installs generation on the backend upon opt-in.
+		 *
+		 * @author Vova Feldman (@svovaf)
+		 * @since  1.2.3
+		 */
+		$unique_id = md5( $key . $secure_auth );
+		
+		return $unique_id;
+	}
+	
+	/**
+	 * Get client IP.
+	 *
+	 * @author Vova Feldman (@svovaf)
+	 * @since  1.1.2
+	 *
+	 * @return string|null
+	 */
+	protected function get_user_ip() {
+		$fields = array(
+			'HTTP_CF_CONNECTING_IP',
+			'HTTP_CLIENT_IP',
+			'HTTP_X_FORWARDED_FOR',
+			'HTTP_X_FORWARDED',
+			'HTTP_FORWARDED_FOR',
+			'HTTP_FORWARDED',
+			'REMOTE_ADDR',
+		);
+		
+		foreach ( $fields as $ip_field ) {
+			if ( ! empty( $_SERVER[ $ip_field ] ) ) {
+				return $_SERVER[ $ip_field ];
+			}
+		}
+		
+		return null;
+	}
 	
 	/**
 	 * @param bool $flush
