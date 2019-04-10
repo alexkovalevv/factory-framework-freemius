@@ -9,19 +9,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * @author Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com>
- * @link https://webcraftic.com
+ * @author        Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com>
+ * @link          https://webcraftic.com
  * @copyright (c) 2018 Webraftic Ltd, Freemius, Inc.
- * @version 1.0
+ * @version       1.0
  */
 class Plugin extends Scope {
-	
+
 	/**
 	 * @since 1.0.6
 	 * @var null|number
 	 */
 	public $parent_plugin_id;
-	
+
 	/**
 	 * @var string
 	 */
@@ -30,87 +30,72 @@ class Plugin extends Scope {
 	 * @var string
 	 */
 	public $slug;
-	
+
 	/**
 	 * @var string
 	 */
 	public $premium_slug;
-	
+
 	/**
 	 * @var string 'plugin' or 'theme'
 	 */
 	public $type;
-	
+
 	/**
-	 * @var string|false false if the module doesn't have an affiliate program or one of the following: 'selected', 'customers', or 'all'.
+	 * @var string|false false if the module doesn't have an affiliate program or one of the following: 'selected',
+	 *      'customers', or 'all'.
 	 */
 	public $affiliate_moderation;
-	
+
 	/**
 	 * @var bool Set to true if the free version of the module is hosted on WordPress.org. Defaults to true.
 	 */
 	public $is_wp_org_compliant = true;
-	
+
 	/**
 	 * @var string
 	 */
 	public $file;
-	
+
 	/**
 	 * @var string
 	 */
 	public $version;
-	
+
 	/**
 	 * @var bool
 	 */
 	public $auto_update;
-	
-	/**
-	 * @var Plugin_Info
-	 */
-	//public $info;
-	
+
 	/**
 	 * @var bool
 	 */
 	public $is_premium;
-	
+
 	/**
 	 * @var string
 	 */
 	public $premium_suffix;
-	
+
 	/**
 	 * @var bool
 	 */
 	public $is_live;
-	
+
 	const AFFILIATE_MODERATION_CUSTOMERS = 'customers';
-	
+
 	#endregion Install Specific Properties
-	
+
 	/**
 	 * @param stdClass|bool $plugin
 	 */
 	function __construct( $plugin = false ) {
 		parent::__construct( $plugin );
-		
+
 		$this->is_premium = false;
 		$this->is_live    = true;
-		
-		/*if ( empty( $this->premium_slug ) && ! empty( $plugin->slug ) ) {
-			$this->premium_slug = "{$this->slug}-premium";
-		}
-		
-		if ( empty( $this->premium_suffix ) ) {
-			$this->premium_suffix = '(Premium)';
-		}*/
-		/*if ( isset( $plugin->info ) && is_object( $plugin->info ) ) {
-			$this->info = new FS_Plugin_Info( $plugin->info );
-		}*/
 	}
-	
+
 	/**
 	 * Check if plugin is an add-on (has parent).
 	 *
@@ -122,7 +107,7 @@ class Plugin extends Scope {
 	function is_addon() {
 		return isset( $this->parent_plugin_id ) && is_numeric( $this->parent_plugin_id );
 	}
-	
+
 	static function get_type() {
 		return 'plugin';
 	}
