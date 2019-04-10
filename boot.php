@@ -2,7 +2,7 @@
 /**
  * Load Freemius module.
  *
- * @author Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com> *
+ * @author Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com>
  * @copyright (c) 2018, Webcraftic Ltd
  *
  * @package core
