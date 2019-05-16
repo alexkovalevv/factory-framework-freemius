@@ -193,7 +193,13 @@ final class Provider extends License_Provider {
 			$latest = $this->get_api_site_scope( $this->license_site )->call( "/updates/latest.json" );
 
 			if ( isset( $latest->error ) ) {
-				throw new Exception( $latest->error );
+				$error = $latest->error;
+
+				if ( is_object( $error ) || is_array( $error ) ) {
+					$error = var_export( $error, true );
+				}
+
+				throw new Exception( "Freemius API ERROR:" . $error );
 			}
 		} catch( \Freemius_Exception $e ) {
 			throw new Exception( $e->getMessage(), $e->getCode() );
