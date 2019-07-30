@@ -2,11 +2,11 @@
 /**
  * Load Freemius module.
  *
- * @author Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com>
+ * @author        Webcraftic <wordpress.webraftic@gmail.com>, Alex Kovalev <alex.kovalevv@gmail.com>
+ * @since         1.0.0
+ * @package       core
  * @copyright (c) 2018, Webcraftic Ltd
  *
- * @package core
- * @since 1.0.0
  */
 
 // Exit if accessed directly
@@ -17,6 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'FACTORY_FREEMIUS_000_LOADED' ) ) {
 	return;
 }
+
+define( 'FACTORY_FREEMIUS_VERSION', '1.0.4' );
 
 define( 'FACTORY_FREEMIUS_000_LOADED', true );
 define( 'FACTORY_FREEMIUS_000_DIR', dirname( __FILE__ ) );
