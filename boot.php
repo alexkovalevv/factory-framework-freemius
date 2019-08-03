@@ -44,6 +44,9 @@ require_once( FACTORY_FREEMIUS_000_DIR . '/includes/class-freemius-api.php' );
  * @param Wbcr_Factory000_Plugin $plugin
  */
 add_action( 'wbcr_factory_freemius_000_plugin_created', function ( $plugin ) {
+	# Устанавливаем класс провайдера лицензий для премиум менеджера
 	$plugin->set_license_provider( 'freemius', 'WBCR\Factory_Freemius_000\Premium\Provider' );
+	# Устанавливаем класс репозитория обновлений для менеджера обновлений
+	$plugin->set_update_repository( 'freemius', 'WBCR\Factory_Freemius_000\Updates\Freemius_Repository' );
 } );
 #endcomp
