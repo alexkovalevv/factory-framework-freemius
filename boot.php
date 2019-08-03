@@ -31,9 +31,7 @@ require_once( FACTORY_FREEMIUS_000_DIR . '/includes/entities/class-freemius-scop
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/entities/class-freemius-user.php' );
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/entities/class-freemius-site.php' );
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/entities/class-freemius-license.php' );
-
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/licensing/class-freemius-provider.php' );
-
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/updates/class-freemius-repository.php' );
 
 if ( ! class_exists( 'Freemius_Api_WordPress' ) ) {
@@ -41,4 +39,11 @@ if ( ! class_exists( 'Freemius_Api_WordPress' ) ) {
 }
 
 require_once( FACTORY_FREEMIUS_000_DIR . '/includes/class-freemius-api.php' );
+
+/**
+ * @param Wbcr_Factory000_Plugin $plugin
+ */
+add_action( 'wbcr_factory_freemius_000_plugin_created', function ( $plugin ) {
+	$plugin->set_license_provider( 'freemius', 'WBCR\Factory_Freemius_000\Premium\Provider' );
+} );
 #endcomp
