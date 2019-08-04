@@ -18,7 +18,7 @@ if ( defined( 'FACTORY_FREEMIUS_000_LOADED' ) ) {
 	return;
 }
 
-define( 'FACTORY_FREEMIUS_VERSION', '1.0.5' );
+define( 'FACTORY_FREEMIUS_VERSION', '1.0.7' );
 
 define( 'FACTORY_FREEMIUS_000_LOADED', true );
 define( 'FACTORY_FREEMIUS_000_DIR', dirname( __FILE__ ) );
